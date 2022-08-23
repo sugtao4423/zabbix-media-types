@@ -1,0 +1,152 @@
+zabbix_export:
+  version: '6.0'
+  date: '2022-08-23T09:33:31Z'
+  media_types:
+    -
+      name: Slack
+      type: WEBHOOK
+      parameters:
+        -
+          name: datetime
+          value: '{DATE} / {TIME}'
+        -
+          name: hostName
+          value: '{HOST.NAME}'
+        -
+          name: itemId
+          value: '{ITEM.ID1}'
+        -
+          name: itemValue
+          value: '{ITEM.VALUE1}'
+        -
+          name: slackWebhookUrl
+          value: '<Put your Slack webhook URL>'
+        -
+          name: triggerName
+          value: '{EVENT.NAME}'
+        -
+          name: triggerSeverity
+          value: '{TRIGGER.SEVERITY}'
+        -
+          name: triggerStatus
+          value: '{TRIGGER.STATUS}'
+        -
+          name: triggerUrl
+          value: '{TRIGGER.URL}'
+        -
+          name: zabbixUrl
+          value: '<Put your Zabbix URL>'
+      script: |
+        const params = JSON.parse(value)
+        const zabbixUrl = params.zabbixUrl
+        const slackWebhookUrl = params.slackWebhookUrl
+        
+        const hostName = params.hostName
+        const triggerName = params.triggerName
+        const triggerStatus = params.triggerStatus
+        const triggerSeverity = params.triggerSeverity
+        var triggerUrl = params.triggerUrl
+        const datetime = params.datetime
+        const itemValue = params.itemValue
+        const itemId = params.itemId
+        
+        var title = hostName + ': ' + triggerName
+        if(triggerStatus === 'OK') {
+          title = '** RECOVERY alert - ' + title
+        } else {
+          title = '** PROBLEM alert - ' + title
+        }
+        
+        if (!triggerUrl) {
+          triggerUrl = zabbixUrl + '/history.php?action=showgraph&itemids[]=' + itemId
+        }
+        
+        var color
+        if (triggerStatus === 'OK') {
+          switch (triggerSeverity) {
+            case 'Information':
+              color = '#439FE0'
+              break
+            default:
+              color = 'good'
+              break
+          }
+        } else if (triggerStatus === 'PROBLEM') {
+          switch (triggerSeverity) {
+            case 'Information':
+              color = '#439FE0'
+              break
+            case 'Warning':
+              color = 'warning'
+              break
+            default:
+              color = 'danger'
+              break
+          }
+        } else {
+          color = '#808080'
+        }
+        
+        const json = {
+          attachments: [
+            {
+              fallback: 'Date / Time: ' + datetime + ' - ' + title,
+              title: title,
+              title_link: triggerUrl,
+              color: color,
+              fields: [
+                {
+                  title: 'Date / Time',
+                  value: datetime,
+                  short: true,
+                },
+                {
+                  title: 'Status',
+                  value: triggerStatus,
+                  short: true,
+                },
+                {
+                  title: 'Host',
+                  value: hostName,
+                  short: true,
+                },
+                {
+                  title: 'Trigger',
+                  value: triggerName + ': ' + itemValue,
+                  short: true,
+                },
+              ],
+            },
+          ],
+        }
+        
+        try {
+          const req = new HttpRequest()
+          const res = req.post(slackWebhookUrl, JSON.stringify(json))
+        
+          const code = req.getStatus()
+          if (code < 200 || code >= 300) {
+            throw 'Response code: ' + req.getStatus()
+          }
+        
+          return res
+        } catch (error) {
+          Zabbix.log(4, '[ Slack Webhook ] Slack notification failed : ' + error)
+          throw 'Slack notification failed : ' + error
+        }
+      message_templates:
+        -
+          event_source: TRIGGERS
+          operation_mode: PROBLEM
+        -
+          event_source: TRIGGERS
+          operation_mode: RECOVERY
+        -
+          event_source: TRIGGERS
+          operation_mode: UPDATE
+        -
+          event_source: DISCOVERY
+          operation_mode: PROBLEM
+        -
+          event_source: AUTOREGISTRATION
+          operation_mode: PROBLEM
