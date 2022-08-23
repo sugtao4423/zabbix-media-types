@@ -1,0 +1,64 @@
+zabbix_export:
+  version: '6.0'
+  date: '2022-08-23T09:56:10Z'
+  media_types:
+    -
+      name: 'FCM UPS'
+      type: WEBHOOK
+      parameters:
+        -
+          name: deviceToken
+          value: '<Put your DeviceToken>'
+        -
+          name: hostName
+          value: '{HOST.NAME}'
+        -
+          name: serverKey
+          value: '<Put your ServerKey>'
+        -
+          name: triggerStatus
+          value: '{TRIGGER.STATUS}'
+      script: |
+        const params = JSON.parse(value)
+        const serverKey = params.serverKey
+        const deviceToken = params.deviceToken
+        const hostName = params.hostName
+        const triggerStatus = params.triggerStatus
+        
+        const data = {
+          ups_name: hostName,
+          ups_status: triggerStatus,
+        }
+        
+        const json = {
+          data: data,
+          to: deviceToken,
+        }
+        
+        try {
+          const url = 'https://fcm.googleapis.com/fcm/send'
+          const req = new HttpRequest()
+          req.addHeader('Content-Type: application/json')
+          req.addHeader('Authorization: key=' + serverKey)
+          const res = req.post(url, JSON.stringify(json))
+        
+          const code = req.getStatus()
+          if (code < 200 || code >= 300) {
+            throw 'Response code: ' + req.getStatus()
+          }
+        
+          return res
+        } catch (error) {
+          Zabbix.log(4, '[ FCM Webhook ] FCM send failed : ' + error)
+          throw 'FCM send failed : ' + error
+        }
+      message_templates:
+        -
+          event_source: TRIGGERS
+          operation_mode: PROBLEM
+        -
+          event_source: TRIGGERS
+          operation_mode: RECOVERY
+        -
+          event_source: TRIGGERS
+          operation_mode: UPDATE
