@@ -1,40 +1,28 @@
 zabbix_export:
-  version: '6.0'
-  date: '2022-08-23T09:33:31Z'
+  version: '6.4'
   media_types:
-    -
-      name: Slack
+    - name: Slack
       type: WEBHOOK
       parameters:
-        -
-          name: datetime
+        - name: datetime
           value: '{DATE} / {TIME}'
-        -
-          name: hostName
+        - name: hostName
           value: '{HOST.NAME}'
-        -
-          name: itemId
+        - name: itemId
           value: '{ITEM.ID1}'
-        -
-          name: itemValue
+        - name: itemValue
           value: '{ITEM.VALUE1}'
-        -
-          name: slackWebhookUrl
+        - name: slackWebhookUrl
           value: '<Put your Slack webhook URL>'
-        -
-          name: triggerName
+        - name: triggerName
           value: '{EVENT.NAME}'
-        -
-          name: triggerPriority
+        - name: triggerPriority
           value: '{TRIGGER.NSEVERITY}'
-        -
-          name: triggerStatus
+        - name: triggerStatus
           value: '{TRIGGER.STATUS}'
-        -
-          name: triggerUrl
+        - name: triggerUrl
           value: '{TRIGGER.URL}'
-        -
-          name: zabbixUrl
+        - name: zabbixUrl
           value: '<Put your Zabbix URL>'
       script: |
         const params = JSON.parse(value)
@@ -124,18 +112,13 @@ zabbix_export:
           throw 'Slack notification failed : ' + error
         }
       message_templates:
-        -
-          event_source: TRIGGERS
+        - event_source: TRIGGERS
           operation_mode: PROBLEM
-        -
-          event_source: TRIGGERS
+        - event_source: TRIGGERS
           operation_mode: RECOVERY
-        -
-          event_source: TRIGGERS
+        - event_source: TRIGGERS
           operation_mode: UPDATE
-        -
-          event_source: DISCOVERY
+        - event_source: DISCOVERY
           operation_mode: PROBLEM
-        -
-          event_source: AUTOREGISTRATION
+        - event_source: AUTOREGISTRATION
           operation_mode: PROBLEM

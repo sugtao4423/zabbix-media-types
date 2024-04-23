@@ -1,22 +1,16 @@
 zabbix_export:
-  version: '6.0'
-  date: '2022-08-23T09:56:10Z'
+  version: '6.4'
   media_types:
-    -
-      name: 'FCM UPS'
+    - name: 'FCM UPS'
       type: WEBHOOK
       parameters:
-        -
-          name: deviceToken
+        - name: deviceToken
           value: '<Put your DeviceToken>'
-        -
-          name: hostName
+        - name: hostName
           value: '{HOST.NAME}'
-        -
-          name: serverKey
+        - name: serverKey
           value: '<Put your ServerKey>'
-        -
-          name: triggerStatus
+        - name: triggerStatus
           value: '{TRIGGER.STATUS}'
       script: |
         const params = JSON.parse(value)
@@ -53,12 +47,9 @@ zabbix_export:
           throw 'FCM send failed : ' + error
         }
       message_templates:
-        -
-          event_source: TRIGGERS
+        - event_source: TRIGGERS
           operation_mode: PROBLEM
-        -
-          event_source: TRIGGERS
+        - event_source: TRIGGERS
           operation_mode: RECOVERY
-        -
-          event_source: TRIGGERS
+        - event_source: TRIGGERS
           operation_mode: UPDATE
