@@ -25,8 +25,8 @@ zabbix_export:
           name: triggerName
           value: '{EVENT.NAME}'
         -
-          name: triggerSeverity
-          value: '{TRIGGER.SEVERITY}'
+          name: triggerPriority
+          value: '{TRIGGER.NSEVERITY}'
         -
           name: triggerStatus
           value: '{TRIGGER.STATUS}'
@@ -44,7 +44,7 @@ zabbix_export:
         const hostName = params.hostName
         const triggerName = params.triggerName
         const triggerStatus = params.triggerStatus
-        const triggerSeverity = params.triggerSeverity
+        const triggerPriority = params.triggerPriority
         const triggerUrl = params.triggerUrl
         const datetime = params.datetime
         const itemValue = params.itemValue
@@ -61,23 +61,17 @@ zabbix_export:
           return zabbixUrl + '/history.php?action=showgraph&itemids[]=' + itemId
         })()
         
+        // Priority: 0=Not classified, 1=Information, 2=Warning, 3=Average, 4=High, 5=Disaster
         const color = (function () {
+          const priority = Number(triggerPriority)
+          if (priority === 1) return '#439FE0'
+        
           if (triggerStatus === 'OK') {
-            switch (triggerSeverity) {
-              case 'Information':
-                return '#439FE0'
-              default:
-                return 'good'
-            }
-          } else if (triggerStatus === 'PROBLEM') {
-            switch (triggerSeverity) {
-              case 'Information':
-                return '#439FE0'
-              case 'Warning':
-                return 'warning'
-              default:
-                return 'danger'
-            }
+            return 'good'
+          }
+          if (triggerStatus === 'PROBLEM') {
+            if (priority === 2) return 'warning'
+            return 'danger'
           }
           return '#808080'
         })()
