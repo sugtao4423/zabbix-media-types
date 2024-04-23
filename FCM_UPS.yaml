@@ -44,7 +44,7 @@ zabbix_export:
         
           const code = req.getStatus()
           if (code < 200 || code >= 300) {
-            throw 'Response code: ' + req.getStatus()
+            throw 'Response code: ' + code
           }
         
           return res

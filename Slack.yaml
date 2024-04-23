@@ -45,54 +45,49 @@ zabbix_export:
         const triggerName = params.triggerName
         const triggerStatus = params.triggerStatus
         const triggerSeverity = params.triggerSeverity
-        var triggerUrl = params.triggerUrl
+        const triggerUrl = params.triggerUrl
         const datetime = params.datetime
         const itemValue = params.itemValue
         const itemId = params.itemId
         
-        var title = hostName + ': ' + triggerName
-        if(triggerStatus === 'OK') {
-          title = '** RECOVERY alert - ' + title
-        } else {
-          title = '** PROBLEM alert - ' + title
-        }
+        const title = (function () {
+          const prefix =
+            triggerStatus === 'OK' ? '** RECOVERY alert - ' : '** PROBLEM alert - '
+          return prefix + hostName + ': ' + triggerName
+        })()
         
-        if (!triggerUrl) {
-          triggerUrl = zabbixUrl + '/history.php?action=showgraph&itemids[]=' + itemId
-        }
+        const triggerHistoryUrl = (function () {
+          if (triggerUrl) return triggerUrl
+          return zabbixUrl + '/history.php?action=showgraph&itemids[]=' + itemId
+        })()
         
-        var color
-        if (triggerStatus === 'OK') {
-          switch (triggerSeverity) {
-            case 'Information':
-              color = '#439FE0'
-              break
-            default:
-              color = 'good'
-              break
+        const color = (function () {
+          if (triggerStatus === 'OK') {
+            switch (triggerSeverity) {
+              case 'Information':
+                return '#439FE0'
+              default:
+                return 'good'
+            }
+          } else if (triggerStatus === 'PROBLEM') {
+            switch (triggerSeverity) {
+              case 'Information':
+                return '#439FE0'
+              case 'Warning':
+                return 'warning'
+              default:
+                return 'danger'
+            }
           }
-        } else if (triggerStatus === 'PROBLEM') {
-          switch (triggerSeverity) {
-            case 'Information':
-              color = '#439FE0'
-              break
-            case 'Warning':
-              color = 'warning'
-              break
-            default:
-              color = 'danger'
-              break
-          }
-        } else {
-          color = '#808080'
-        }
+          return '#808080'
+        })()
         
         const json = {
           attachments: [
             {
               fallback: 'Date / Time: ' + datetime + ' - ' + title,
               title: title,
-              title_link: triggerUrl,
+              title_link: triggerHistoryUrl,
               color: color,
               fields: [
                 {
@@ -126,7 +121,7 @@ zabbix_export:
         
           const code = req.getStatus()
           if (code < 200 || code >= 300) {
-            throw 'Response code: ' + req.getStatus()
+            throw 'Response code: ' + code
           }
         
           return res
