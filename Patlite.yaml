@@ -1,0 +1,108 @@
+zabbix_export:
+  version: '6.4'
+  media_types:
+    - name: Patlite
+      type: WEBHOOK
+      parameters:
+        - name: patliteUrl
+          value: 'http://<Put your Patlite ip>'
+        - name: triggerPriority
+          value: '{TRIGGER.NSEVERITY}'
+        - name: triggerStatus
+          value: '{TRIGGER.STATUS}'
+        - name: zabbixApiToken
+          value: '<Put your Zabbix API Token>'
+        - name: zabbixUrl
+          value: '<Put your Zabbix URL>'
+      script: |
+        const params = JSON.parse(value)
+        const patliteUrl = params.patliteUrl
+        const triggerPriority = params.triggerPriority
+        const triggerStatus = params.triggerStatus
+        const zabbixApiToken = params.zabbixApiToken
+        const zabbixUrl = params.zabbixUrl
+        
+        function getZabbixAlerts() {
+          const url = zabbixUrl + '/api_jsonrpc.php'
+          const id = Math.floor(Math.random() * 1000)
+          const body = {
+            jsonrpc: '2.0',
+            method: 'trigger.get',
+            params: {
+              output: ['triggerid', 'priority'],
+              filter: {
+                value: 1,
+              },
+              only_true: true,
+              active: true,
+              monitored: true,
+            },
+            id,
+            auth: zabbixApiToken,
+          }
+        
+          const req = new HttpRequest()
+          req.addHeader('Content-Type: application/json-rpc')
+          const res = req.post(url, JSON.stringify(body))
+        
+          const code = req.getStatus()
+          if (code < 200 || code >= 300) {
+            throw 'Response code: ' + code
+          }
+          const json = JSON.parse(res)
+          if (id !== json.id) {
+            throw 'Invalid id'
+          }
+          return json.result
+        }
+        
+        // Zabbix: 0=Not classified, 1=Information, 2=Warning, 3=Average, 4=High, 5=Disaster
+        // Patlite index: 0=Red, 1=Yellow, 2=Green, 3=Blue, 4=White, 5=Buzzer
+        function zabbixPriority2PatliteCodeIndex(priority) {
+          if (priority <= 1) return 2
+          if (priority <= 3) return 1
+          return 0
+        }
+        
+        function setPatlite(code) {
+          const isClear = code === false
+          const url = patliteUrl + '/api/control'
+          const p = isClear ? '?clear=1' : '?alert=' + code
+        
+          const req = new HttpRequest()
+          return req.get(url + p)
+        }
+        
+        // Trigger recovery
+        if (triggerStatus === 'OK') {
+          const alerts = getZabbixAlerts()
+          if (alerts.length === 0) {
+            return setPatlite(false)
+          }
+        
+          const priorities = alerts.map(function (a) {
+            return Number(a.priority)
+          })
+          const patliteCodes = [0, 0, 0, 0, 0, 0]
+          priorities.forEach(function (p) {
+            patliteCodes[zabbixPriority2PatliteCodeIndex(p)] = 1
+          })
+          return setPatlite(patliteCodes.join(''))
+        }
+        
+        // Trigger alert
+        if (triggerStatus === 'PROBLEM') {
+          const patliteCodes = [9, 9, 9, 9, 9, 0]
+          const priority = Number(triggerPriority)
+          patliteCodes[zabbixPriority2PatliteCodeIndex(priority)] = 1
+          return setPatlite(patliteCodes.join(''))
+        }
+        
+        throw 'Invalid trigger status: ' + triggerStatus
+      message_templates:
+        - event_source: TRIGGERS
+          operation_mode: PROBLEM
+        - event_source: TRIGGERS
+          operation_mode: RECOVERY
+        - event_source: TRIGGERS
+          operation_mode: UPDATE
