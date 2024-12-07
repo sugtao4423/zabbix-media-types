@@ -1,0 +1,102 @@
+zabbix_export:
+  version: '7.0'
+  media_types:
+    - name: FCM
+      type: WEBHOOK
+      parameters:
+        - name: deviceToken
+          value: '<Put your DeviceToken>'
+        - name: firebaseSaClientEmail
+          value: '<Put your Firebase Service Account's client_email>'
+        - name: firebaseSaPrivateKey
+          value: '<Put your Firebase Service Account's private_key>'
+        - name: firebaseSaProjectId
+          value: '<Put your Firebase Service Account's project_id>'
+        - name: hostName
+          value: '{HOST.NAME}'
+        - name: triggerStatus
+          value: '{TRIGGER.STATUS}'
+      script: |
+        const params = JSON.parse(value)
+        const firebaseSaClientEmail = params.firebaseSaClientEmail
+        const firebaseSaPrivateKey = params.firebaseSaPrivateKey
+        const firebaseSaProjectId = params.firebaseSaProjectId
+        const deviceToken = params.deviceToken
+        const hostName = params.hostName
+        const triggerStatus = params.triggerStatus
+
+        function base64url(str) {
+          return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+        }
+
+        function hexToBinary(hex) {
+          const binaryArray = new Uint8Array(hex.length / 2)
+          for (var i = 0; i < hex.length; i += 2) {
+            binaryArray[i / 2] = parseInt(hex.substr(i, 2), 16)
+          }
+          return binaryArray
+        }
+
+        const jwtHeader = base64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }))
+        const jwtPayload = base64url(JSON.stringify({
+          iss: firebaseSaClientEmail,
+          scope: 'https://www.googleapis.com/auth/firebase.messaging',
+          aud: 'https://oauth2.googleapis.com/token',
+          iat: Math.floor(Date.now() / 1000),
+          exp: Math.floor(Date.now() / 1000) + 3600,
+        }))
+        const jwtUnsignedToken = jwtHeader + '.' + jwtPayload
+        const jwtSignatureHex = sign('sha256', firebaseSaPrivateKey, jwtUnsignedToken)
+        const jwt = jwtUnsignedToken + '.' + base64url(hexToBinary(jwtSignatureHex))
+
+        var accessToken = ''
+        try {
+          const url = 'https://oauth2.googleapis.com/token'
+          const req = new HttpRequest()
+          req.addHeader('Content-Type: application/x-www-form-urlencoded')
+          const res = req.post(url, 'grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=' + jwt)
+
+          const code = req.getStatus()
+          if (code < 200 || code >= 300) {
+            throw 'Response code: ' + code
+          }
+
+          const resJson = JSON.parse(res)
+          accessToken = resJson.access_token
+        } catch (error) {
+          Zabbix.log(4, '[ FCM Webhook ] Access token get failed: ' + error)
+          throw 'Access token get failed: ' + error
+        }
+
+        try {
+          const url = 'https://fcm.googleapis.com/v1/projects/' + firebaseSaProjectId + '/messages:send'
+          const req = new HttpRequest()
+          req.addHeader('Content-Type: application/json')
+          req.addHeader('Authorization: Bearer ' + accessToken)
+          const res = req.post(url, JSON.stringify({
+            message: {
+              token: deviceToken,
+              data: {
+                ups_name: hostName,
+                ups_status: triggerStatus,
+              },
+            },
+          }))
+
+          const code = req.getStatus()
+          if (code < 200 || code >= 300) {
+            throw 'Response code: ' + code
+          }
+
+          return res
+        } catch (error) {
+          Zabbix.log(4, '[ FCM Webhook ] FCM send failed: ' + error)
+          throw 'FCM send failed: ' + error
+        }
+      message_templates:
+        - event_source: TRIGGERS
+          operation_mode: PROBLEM
+        - event_source: TRIGGERS
+          operation_mode: RECOVERY
+        - event_source: TRIGGERS
+          operation_mode: UPDATE
