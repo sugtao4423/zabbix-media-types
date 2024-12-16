@@ -1,5 +1,5 @@
 zabbix_export:
-  version: '6.4'
+  version: '7.2'
   media_types:
     - name: Patlite
       type: WEBHOOK
@@ -38,10 +38,10 @@ zabbix_export:
               monitored: true,
             },
             id,
-            auth: zabbixApiToken,
           }
         
           const req = new HttpRequest()
+          req.addHeader('Authorization: Bearer ' + zabbixApiToken)
           req.addHeader('Content-Type: application/json-rpc')
           const res = req.post(url, JSON.stringify(body))
         
